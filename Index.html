@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080, height=1920">
+<title>ISGEC – SugarNXT 2026 (Vertical 1080×1920)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700&display=swap');
+
+:root{
+  --bg:    #060d08;
+  --neon:  #00e676;
+  --neon2: #69f0ae;
+  --neon3: #00c853;
+  --red:   #C8102E;
+  --blue2: #004BB4;
+  --white: #FFFFFF;
+  --off:   #e8f5e9;
+  --steel: #80cbc4;
+  --dim:   #2e7d32;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+html,body{
+  width:100%;height:100%;background:#000;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;
+}
+
+/* Fixed 1080×1920 stage */
+#stage{
+  position:relative;width:1080px;height:1920px;
+  background:var(--bg);overflow:hidden;z-index:2;
+}
+
+#dotCanvas{
+  position:absolute;top:0;left:0;width:1080px;height:1920px;z-index:0;
+}
+#particleCanvas{
+  position:absolute;top:0;left:0;width:1080px;height:1920px;z-index:0;pointer-events:none;
+}
+
+/* Persistent corner logo & marks */
+#corner-logo{
+  position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:850;
+  display:none;align-items:center;gap:10px;opacity:.9;
+}
+#corner-logo img{width:250px;height:auto;filter:drop-shadow(0 0 10px rgba(0,230,118,.35));}
+
+.cm{position:absolute;width:40px;height:40px;z-index:800;opacity:.45;}
+.cm.tr{top:18px;right:18px;border-top:1px solid var(--neon);border-right:1px solid var(--neon);}
+.cm.bl{bottom:18px;left:18px;border-bottom:1px solid var(--neon3);border-left:1px solid var(--neon3);}
+.cm.br{bottom:18px;right:18px;border-bottom:1px solid var(--neon3);border-right:1px solid var(--neon3);}
+
+#progress{
+  position:absolute;bottom:0;left:0;height:3px;width:100%;z-index:999;
+  background:linear-gradient(90deg,var(--blue2),var(--neon),var(--neon2));
+  transition:width .3s linear;
+}
+
+/* Scenes */
+.scene{
+  position:absolute;inset:0;z-index:2;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 70px;opacity:0;pointer-events:none;
+}
+.scene:not(#s1){
+  padding-top:500px;
+  justify-content:flex-start;
+}
+
+.scene.enter-zoom        {animation:sceneFadeIn .55s cubic-bezier(.16,1,.3,1) forwards;}
+.scene.enter-from-bottom {animation:sceneFadeIn .55s cubic-bezier(.16,1,.3,1) forwards;}
+.scene.enter-from-right  {animation:slideInRight  .7s cubic-bezier(.22,1,.36,1) forwards;}
+.scene.enter-from-left   {animation:slideInLeft   .7s cubic-bezier(.22,1,.36,1) forwards;}
+.scene.exit-to-left      {animation:sceneFadeOut  .4s cubic-bezier(.4,0,1,1) forwards;pointer-events:none;}
+.scene.exit-to-right     {animation:slideOutRight .6s cubic-bezier(.55,0,1,.45) forwards;pointer-events:none;}
+.scene.exit-to-top       {animation:sceneFadeOut  .4s cubic-bezier(.4,0,1,1) forwards;pointer-events:none;}
+.scene.exit-zoom-out     {animation:zoomOut       .6s cubic-bezier(.55,0,1,.45) forwards;pointer-events:none;}
+
+@keyframes sceneFadeIn {from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+@keyframes sceneFadeOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(1.03)}}
+@keyframes slideInRight {from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInLeft  {from{opacity:0;transform:translateX(-100px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideOutRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(100px)}}
+@keyframes fadeUp       {from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn       {from{opacity:0}to{opacity:1}}
+@keyframes blinkDot     {0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes neonPulse    {0%,100%{box-shadow:0 0 30px rgba(0,230,118,.2),0 0 60px rgba(0,230,118,.06)}50%{box-shadow:0 0 80px rgba(0,230,118,.6),0 0 160px rgba(0,230,118,.22)}}
+@keyframes countUp      {from{opacity:0;transform:scale(.6) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes lineGrow     {from{width:0}to{width:100%}}
+@keyframes zoomOut      {from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(1.1)}}
+@keyframes tickerScroll {from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes vScroll      {from{transform:translateY(0)}to{transform:translateY(-50%)}}
+
+/* Shared components */
+.eyebrow{
+  font-weight:300;font-size:60px;letter-spacing:6px;color:var(--neon);
+  text-transform:uppercase;margin-bottom:18px;opacity:0;animation:fadeUp .8s .3s ease forwards;
+}
+.neon-rule{
+  height:3px;width:80px;background:var(--neon);box-shadow:0 0 12px var(--neon);margin:22px 0;
+}
+.big-statement{
+  font-family:'Bebas Neue',sans-serif;font-size:110px;line-height:.95;
+  color:var(--white);letter-spacing:2px;opacity:0;animation:fadeUp 1s .4s ease forwards;
+}
+.big-statement .hl{color:var(--neon);}
+.scene-intro{
+  font-size:60px;color:var(--off);font-weight:300;letter-spacing:1px;
+  max-width:900px;line-height:1.5;opacity:0;animation:fadeUp .9s 1.2s ease forwards;
+}
+
+/* Bullet lists */
+.blist{display:flex;flex-direction:column;gap:60px;width:100%;margin-top:30px;}
+.bitem{display:flex;gap:40px;align-items:flex-start;opacity:0;transform:translateX(24px);transition:opacity .5s ease,transform .5s ease;}
+.bitem.show{opacity:1;transform:translateX(0);}
+.bnum{
+  width:150px;height:150px;border:2px solid var(--neon);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Bebas Neue',sans-serif;font-size:60px;color:var(--neon);
+  flex-shrink:0;box-shadow:0 0 8px rgba(0,230,118,.2);
+}
+.btxt{font-size:65px;color:var(--off);letter-spacing:.5px;line-height:1.65;font-weight:300;}
+.btxt strong{color:var(--neon2);font-weight:600;}
+.btxt em{color: var(--neon);
+    font-style: normal;
+    font-weight: 500;}
+
+/* ═══════════════════════════════════════════
+   S1 – LOGO REVEAL
+   TEXT BLOCKS: logo alt text, subtitle, tagline, since-line
+═══════════════════════════════════════════ */
+#s1{padding:60px;}
+.s1-mark{opacity:0;animation:fadeUp 1s .1s ease forwards;}
+.s1-mark img{width:400px;height:auto;display:block;margin:0 auto;filter:drop-shadow(0 0 28px rgba(0,230,118,.35));}
+.s1-sub{font-weight:700;font-size:50px;letter-spacing:6px;color:var(--steel);text-transform:uppercase;margin-top:14px;opacity:0;animation:fadeUp 1s .8s ease forwards;}
+.s1-bar{width:0;height:2px;background:var(--neon);box-shadow:0 0 14px var(--neon);margin:28px auto;animation:lineGrow 1s 1.2s ease forwards;}
+.s1-tag{font-size:40px;letter-spacing:3px;color:var(--off);text-align:center;font-weight:300;opacity:0;animation:fadeUp 1.2s 1.8s ease forwards;}
+.s1-tag span{color:var(--neon);font-weight:700;}
+.s1-since{font-size:30px;font-weight:700;letter-spacing:6px;color:var(--dim);text-transform:uppercase;margin-top:16px;opacity:0;animation:fadeUp 1s 2.5s ease forwards;}
+.blink-row{display:flex;gap:12px;justify-content:center;margin-top:36px;opacity:0;animation:fadeIn 1s 3.2s ease forwards;}
+.bdot{width:6px;height:25px;border-radius:50%;background:var(--neon);animation:blinkDot 1.8s ease-in-out infinite;}
+.bdot:nth-child(2){animation-delay:.35s;}
+.bdot:nth-child(3){animation-delay:.7s;}
+
+/* ═══════════════════════════════════════════
+   S2B – ORDER OF MAGNITUDE (ISGEC's Numbers)
+   TEXT BLOCKS: eyebrow, 4 stat cards (number + unit + label)
+═══════════════════════════════════════════ */
+#s2b{justify-content:center;align-items:center;}
+.omag-eyebrow{
+  font-family:'Bebas Neue',sans-serif;font-size:100px;letter-spacing:6px;
+  color:var(--neon);text-transform:uppercase;text-shadow:0 0 40px rgba(0,230,118,.3);
+  opacity:0;animation:fadeUp .8s .2s ease forwards;
+}
+.omag-grid{
+  display:flex;flex-direction:column;gap:18px;width:100%;max-width:940px;padding:0 40px;
+  opacity:0;animation:fadeUp .9s .5s ease forwards;
+}
+.omag-card{
+  display:flex;flex-direction:row;align-items:center;justify-content:space-between;
+  padding:24px 36px;background:rgba(6,13,8,.85);position:relative;overflow:hidden;
+  border-top:3px solid var(--neon);border-left:1px solid rgba(0,230,118,.18);
+}
+.omag-card:nth-child(2){border-top-color:var(--neon2);}
+.omag-card:nth-child(3){border-top-color:var(--steel);}
+.omag-card:nth-child(4){border-top-color:var(--neon3);}
+.omag-card::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(160deg,rgba(0,230,118,.05) 0%,transparent 60%);pointer-events:none;
+}
+.omag-top{display:flex;align-items:baseline;gap:6px;}
+.omag-num{
+  font-family:'Bebas Neue',sans-serif;font-size:110px;color:var(--neon);line-height:.9;
+  text-shadow:0 0 60px rgba(0,230,118,.35);
+}
+.omag-card:nth-child(2) .omag-num{color:var(--neon2);text-shadow:0 0 60px rgba(105,240,174,.3);}
+.omag-card:nth-child(3) .omag-num{color:var(--steel);text-shadow:0 0 60px rgba(128,203,196,.3);}
+.omag-card:nth-child(4) .omag-num{color:var(--neon3);text-shadow:0 0 60px rgba(0,200,83,.3);}
+.omag-unit{font-family:'Bebas Neue',sans-serif;font-size:110px;color:rgba(255,255,255,.5);letter-spacing:2px;}
+.omag-lbl{font-size:42px;letter-spacing:2px;color:var(--off);text-transform:uppercase;text-align:right;max-width:73%;line-height:1.3;}
+
+/* ═══════════════════════════════════════════
+   S3 – GLOBE + 54 COUNTRIES
+   TEXT BLOCKS: top headline, overlay big number, small sub
+═══════════════════════════════════════════ */
+#s3{justify-content:center;align-items:center;gap:20px;}
+.globe-top{
+  font-family:'Bebas Neue',sans-serif;font-size:112px;letter-spacing:4px;
+  color:#fff;text-transform:uppercase;text-align:center;
+  text-shadow:0 2px 30px rgba(0,0,0,.7);line-height:1.05;
+  opacity:0;animation:fadeIn .8s .3s ease forwards;
+}
+#globeCanvas{width:800px;height:800px;margin:20px 0;opacity:0;animation:fadeUp .9s .8s ease forwards;}
+.globe-overlay{text-align:center;opacity:0;animation:fadeUp .9s 1.2s ease forwards;}
+.globe-overlay .big{font-family:'Bebas Neue',sans-serif;font-size:97px;letter-spacing:3px;color:var(--white);}
+.globe-overlay .big span{color:var(--neon);}
+.globe-overlay .small{font-size:46px;letter-spacing:5px;color:var(--steel);text-transform:uppercase;margin-top:8px;}
+
+/* ═══════════════════════════════════════════
+   S4 – FROM CANE TO CRYSTAL + TECH GRID
+   TEXT BLOCKS: eyebrow, title, tagline, 12 tech pills
+═══════════════════════════════════════════ */
+#s4{justify-content:center;align-items:center;gap:18px;padding:60px 50px;}
+.s4-head{position:relative;z-index:1;text-align:center;opacity:0;animation:fadeUp .9s .3s ease forwards;}
+.stmt-eye{font-size:52px;letter-spacing:8px;color:var(--neon);text-transform:uppercase;margin-bottom:60px;}
+.s4-title{
+  font-family:'Bebas Neue',sans-serif;font-size:100px;line-height:.9;letter-spacing:3px;
+  color:var(--white);text-shadow:0 4px 50px rgba(0,0,0,.8);margin:10px 0 0;
+}
+.s4-title .hl{color:var(--neon);}
+.s4-title .hl2{color:var(--neon2);}
+.s4-to{font-size:60px;color:rgba(128,203,196,.5);font-style:italic;letter-spacing:1px;font-family:'Barlow Condensed',sans-serif;font-weight:300;}
+.s4-tagline{font-size:60px;letter-spacing:4px;color:var(--steel);font-weight:300;margin-top:14px;text-transform:uppercase;}
+.s4-rule{width:140px;height:3px;background:linear-gradient(to right,transparent,var(--neon),transparent);margin:18px auto 0;}
+.s4-grid{
+  position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,1fr);gap:16px;
+  width:100%;max-width:940px;opacity:0;animation:fadeUp 1s .9s ease forwards;
+}
+.s4-pill{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 18px;
+    border: 1px solid rgba(0, 230, 118, .28);
+    background: rgba(6, 13, 8, .82);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 2px;
+    color: var(--neon2);
+    text-align: center;
+}
+
+/* ═══════════════════════════════════════════
+   S5 – MILLING
+   TEXT BLOCKS: eyebrow, headline, intro, 4 bullets
+═══════════════════════════════════════════ */
+#s5{align-items:flex-start;}
+
+/* ═══════════════════════════════════════════
+   S6 – FALLING FILM EVAPORATOR
+   TEXT BLOCKS: eyebrow, headline, intro, 4 bullets
+═══════════════════════════════════════════ */
+#s6{align-items:flex-start;}
+
+/* ═══════════════════════════════════════════
+   S7 – SUGAR REFINERY
+   TEXT BLOCKS: eyebrow, headline, intro, 4 bullets
+═══════════════════════════════════════════ */
+#s7{align-items:flex-start;}
+
+/* ═══════════════════════════════════════════
+   S8 – AI VERTICAL CONTINUOUS PAN
+   TEXT BLOCKS: eyebrow, headline, intro, 4 bullets
+═══════════════════════════════════════════ */
+#s8{align-items:flex-start;}
+
+/* ═══════════════════════════════════════════
+   S9 – STEAM ECONOMY
+   TEXT BLOCKS: eyebrow, headline, intro, 4 bullets
+═══════════════════════════════════════════ */
+#s9{align-items:flex-start;}
+
+/* ═══════════════════════════════════════════
+   S8B – VISUAL BREAK: 600 KLPD
+   TEXT BLOCKS: big number, unit, label, sub
+═══════════════════════════════════════════ */
+#s8b{flex-direction:column;justify-content:center;align-items:center;}
+.vb-glow{
+  position:absolute;width:800px;height:800px;border-radius:50%;
+  border:1px solid rgba(0,230,118,.12);box-shadow:0 0 120px rgba(0,230,118,.08);
+  pointer-events:none;animation:neonPulse 4s ease-in-out infinite;
+}
+.vb-bignum{
+  font-family:'Bebas Neue',sans-serif;font-size:220px;line-height:.85;
+  color:var(--neon);text-shadow:0 0 80px rgba(0,230,118,.45);
+  opacity:0;animation:countUp .9s .3s cubic-bezier(.22,1,.36,1) forwards;
+padding-top: 100px;
+}
+.vb-unit{
+  font-family:'Bebas Neue',sans-serif;font-size:70px;color:var(--neon2);letter-spacing:6px;margin-top:-8px;
+  opacity:0;animation:fadeUp .8s .9s ease forwards;
+}
+.vb-label{
+  font-size:44px;letter-spacing:4px;color:var(--off);font-weight:300;text-transform:uppercase;margin-top:16px;
+  opacity:0;animation:fadeUp .8s 1.3s ease forwards;
+}
+.vb-sub{
+  font-size: 52px;
+    letter-spacing: 2px;
+    color: #8acdc7;
+    font-weight: 300;
+    text-align: center;
+    max-width: 900px;
+    margin-top: 22px;
+    opacity: 0;
+    animation: fadeUp .7s 1.8s ease forwards;
+}
+
+/* ═══════════════════════════════════════════
+   S10 – DISTILLERIES & CBG
+   TEXT BLOCKS: eyebrow, headline, industry-first box, 3 bullets
+═══════════════════════════════════════════ */
+#s10{align-items:flex-start;}
+.industry-box{
+  margin-top:4px;padding:16px 20px;border-left:4px solid var(--neon);background:rgba(0,230,118,.08);
+  border-radius:0 6px 6px 0;opacity:0;animation:fadeUp .9s 1.2s ease forwards;
+}
+.industry-box .ib-label{font-size:60px;font-weight:600;letter-spacing:5px;color:var(--neon);text-transform:uppercase;margin-bottom:6px;opacity:.8;}
+.industry-box .ib-text{font-size: 42px;
+    color: #fff;
+    font-weight: 400;
+    letter-spacing: .5px;
+    line-height: 1.3;
+    text-shadow: 0 0 30px rgba(0, 230, 118, .6), 0 2px 8px rgba(0, 0, 0, .8);}
+
+/* ═══════════════════════════════════════════
+   S10B – 54 COUNTRIES VERTICAL TICKER
+   TEXT BLOCKS: headline, sub, vertical ticker country names
+═══════════════════════════════════════════ */
+#s10b{flex-direction:column;justify-content:center;align-items:center;gap:20px;}
+.tkb-head{
+  font-family:'Bebas Neue',sans-serif;font-size:70px;letter-spacing:4px;
+  color:var(--white);line-height:1;text-align:center;opacity:0;animation:fadeUp 1s .3s ease forwards;
+}
+.tkb-head span{color:var(--neon);}
+.tkb-sub{font-size: 53px;
+    letter-spacing: 4px;
+    color: var(--steel);
+    text-transform: uppercase;
+    margin: 31px 0 39px;
+    text-align: center;
+    opacity: 0;
+    animation: fadeUp .8s .8s ease forwards;}
+	
+.nline{height:3px;background:linear-gradient(90deg,transparent,var(--neon),transparent);width:900px;max-width:90%;}
+.vwrap{
+  overflow:hidden;width:900px;max-width:90%;height:680px;
+  mask-image:linear-gradient(to bottom,transparent 0%,black 15%,black 85%,transparent 100%);
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,black 15%,black 85%,transparent 100%);
+}
+.vtrack{display:flex;flex-direction:column;animation:vScroll 50s linear infinite;}
+.vcountry{font-size:55px;color:var(--off);padding:18px 0;text-align:center;border-bottom:1px solid rgba(0,230,118,.15);}
+.vcountry::before{content:'· ';color:var(--neon);}
+</style>
+
+</head>
+<body>
+
+<canvas id="dotCanvas"></canvas>
+
+<div id="stage">
+  <canvas id="particleCanvas"></canvas>
+
+  <!-- Persistent corner logo -->
+  <div id="corner-logo">
+    <img src="uploads/Isgec-logo.png" alt="ISGEC"/>
+  </div>
+
+  <div class="cm tr"></div>
+  <div class="cm bl"></div>
+  <div class="cm br"></div>
+  <div id="progress"></div>
+
+  <!-- S1 TEXT: logo alt, subtitle, tagline, since-line -->
+  <div class="scene" id="s1">
+    <div class="s1-mark"><img src="uploads/Isgec-logo.png" alt="ISGEC"/></div>
+    <div class="s1-sub">Heavy Engineering Ltd.</div>
+    <div class="s1-bar"></div>
+    <div class="s1-tag">Designing &amp; Supplying <span>Full Sugar &amp; Ethanol Plants</span></div>
+    <div class="s1-since">Since 1933 &nbsp;·&nbsp; Engineering for Excellence</div>
+    <div class="blink-row"><div class="bdot"></div><div class="bdot"></div><div class="bdot"></div></div>
+  </div>
+
+  <!-- S2B TEXT: eyebrow, 4 stat cards (number + unit + label) -->
+  <div class="scene omag-scene" id="s2b">
+    <div class="omag-eyebrow">ISGEC's Numbers</div>
+    <div class="omag-grid">
+      <div class="omag-card">
+        <div class="omag-top"><div class="omag-num" id="om1">0</div><div class="omag-unit">+</div></div>
+        <div class="omag-lbl">Countries where ISGEC supplied<br>sugar machinery is working</div>
+      </div>
+      <div class="omag-card">
+        <div class="omag-top"><div class="omag-num" id="om2">0</div><div class="omag-unit">+</div></div>
+        <div class="omag-lbl">Turnkey Sugar<br>Plants</div>
+      </div>
+      <div class="omag-card">
+        <div class="omag-top"><div class="omag-num" id="om3">0</div><div class="omag-unit">+</div></div>
+        <div class="omag-lbl">Mills<br>Supplied</div>
+      </div>
+      <div class="omag-card">
+        <div class="omag-top"><div class="omag-num" id="om4">0</div><div class="omag-unit">+</div></div>
+        <div class="omag-lbl">Boilers<br>Supplied</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S3 TEXT: top headline, overlay big number, small sub -->
+  <div class="scene" id="s3">
+    <div class="globe-top">Where Cane Grows<br>ISGEC Is There</div>
+    <canvas id="globeCanvas"></canvas>
+    <div class="globe-overlay">
+      <div class="big"><span>54</span> Countries Worldwide</div>
+      <div class="small">All cane-cultivating nations on earth</div>
+    </div>
+  </div>
+
+  <!-- S4 TEXT: eyebrow, title, tagline, 12 tech pills -->
+  <div class="scene" id="s4">
+    <div class="s4-head">
+      <div class="stmt-eye">End-to-End Solutions</div>
+      <div class="s4-title">From <span class="hl">Cane</span> <span class="s4-to">to</span> <span class="hl2">Crystal</span></div>
+      <div class="s4-tagline">We deliver complete sugar &amp; ethanol plant solutions</div>
+      <div class="s4-rule"></div>
+    </div>
+    <div class="s4-grid">
+      <div class="s4-pill">Milling</div>
+      <div class="s4-pill">Falling Film Evaporator</div>
+      <div class="s4-pill">Vertical Continuous Pan</div>
+      <div class="s4-pill">Steam Economy</div>
+      <div class="s4-pill">Distillery</div>
+      <div class="s4-pill">Sugar Refinery</div>
+      <div class="s4-pill">Boiler</div>
+      <div class="s4-pill">ZLD</div>
+      <div class="s4-pill">CBG</div>
+      <div class="s4-pill">AI Automation</div>
+      <div class="s4-pill">Energy Audits</div>
+      <div class="s4-pill">Power Plant</div>
+    </div>
+  </div>
+
+  <!-- S5 TEXT: eyebrow, headline, intro, 4 bullets -->
+  <div class="scene" id="s5">
+    <div class="eyebrow">Sugar Machinery</div>
+    <div class="big-statement">Milling</div>
+    <div class="neon-rule"></div>
+    <div class="scene-intro">World-class cane milling technology built for maximum extraction &amp; longevity.</div>
+    <div class="blist">
+      <div class="bitem" id="b51"><div class="bnum">1</div><div class="btxt">Fully automated mills with <strong>AI</strong></div></div>
+      <div class="bitem" id="b52"><div class="bnum">2</div><div class="btxt">Extraction up to <em>97.7%</em> — RME</div></div>
+      <div class="bitem" id="b53"><div class="bnum">3</div><div class="btxt">Up to <em>55" × 110"</em> mill size</div></div>
+      <div class="bitem" id="b54"><div class="bnum">4</div><div class="btxt">Up to <em>24,000 TCD</em> capacity</div></div>
+    </div>
+  </div>
+
+  <!-- S6 TEXT: eyebrow, headline, intro, 4 bullets -->
+  <div class="scene" id="s6">
+    <div class="eyebrow">Innovation · Built In</div>
+    <div class="big-statement">Falling Film<br><span class="hl">Evaporator</span></div>
+    <div class="neon-rule"></div>
+    <div class="scene-intro">Patented FFE technology delivering superior juice evaporation &amp; energy performance.</div>
+    <div class="blist">
+      <div class="bitem" id="b61"><div class="bnum">1</div><div class="btxt">Fully automated with <strong>AI</strong></div></div>
+      <div class="bitem" id="b62"><div class="bnum">2</div><div class="btxt"><strong>Patented technology</strong></div></div>
+      <div class="bitem" id="b63"><div class="bnum">3</div><div class="btxt">State-of-the-art juice distribution</div></div>
+      <div class="bitem" id="b64"><div class="bnum">4</div><div class="btxt"><em>300+</em> installations worldwide</div></div>
+    </div>
+  </div>
+
+  <!-- S7 TEXT: eyebrow, headline, intro, 4 bullets -->
+  <div class="scene" id="s7">
+    <div class="eyebrow">Refining Excellence</div>
+    <div class="big-statement">Sugar<br><span class="hl">Refinery</span></div>
+    <div class="neon-rule"></div>
+    <div class="scene-intro">Pharmaceutical-grade and refined sugar production with best-in-class energy efficiency.</div>
+    <div class="blist">
+      <div class="bitem" id="b71"><div class="bnum">1</div><div class="btxt">Sugar production below <em>10 I.U.</em></div></div>
+      <div class="bitem" id="b72"><div class="bnum">2</div><div class="btxt">Fully automated &amp; <strong>AI enabled</strong></div></div>
+      <div class="bitem" id="b73"><div class="bnum">3</div><div class="btxt">Energy: Back-end refinery <em>22% on cane</em> · Standalone <em>0.3T/T RSO</em></div></div>
+      <div class="bitem" id="b74"><div class="bnum">4</div><div class="btxt"><strong>Pharmaceutical Sugar</strong> &amp; Liquid Sugar</div></div>
+    </div>
+  </div>
+
+  <!-- S8 TEXT: eyebrow, headline, intro, 4 bullets -->
+  <div class="scene" id="s8">
+    <div class="eyebrow">AI Enabled</div>
+    <div class="big-statement"><span class="hl">Vertical</span><br>Continuous<br>Pan</div>
+    <div class="neon-rule"></div>
+    <div class="scene-intro">AI-enabled continuous crystallisation for all sugar grades with industry-best energy performance.</div>
+    <div class="blist">
+      <div class="bitem" id="b81"><div class="bnum">1</div><div class="btxt">Automated crystallisation</div></div>
+      <div class="bitem" id="b82"><div class="bnum">2</div><div class="btxt">For <em>A, B, C</em> · Raw &amp; Refined sugar</div></div>
+      <div class="bitem" id="b83"><div class="bnum">3</div><div class="btxt">Energy consumption <em>230 kg/T</em> on massecuite</div></div>
+      <div class="bitem" id="b84"><div class="bnum">4</div><div class="btxt">Boils on low-pressure vapours up to <em>83°C</em></div></div>
+    </div>
+  </div>
+
+  <!-- S9 TEXT: eyebrow, headline, intro, 4 bullets -->
+  <div class="scene" id="s9">
+    <div class="eyebrow">Energy Efficiency</div>
+    <div class="big-statement">Steam<br><span class="hl">Economy</span></div>
+    <div class="neon-rule"></div>
+    <div class="scene-intro">Maximising every unit of energy from cane to crystal.</div>
+    <div class="blist">
+      <div class="bitem" id="b91"><div class="bnum">1</div><div class="btxt">Plant designed to utilise all waste heat</div></div>
+      <div class="bitem" id="b92"><div class="bnum">2</div><div class="btxt"><em>22%</em> steam consumption on cane</div></div>
+      <div class="bitem" id="b93"><div class="bnum">3</div><div class="btxt">Energy audits to help the industry</div></div>
+      <div class="bitem" id="b94"><div class="bnum">4</div><div class="btxt">Water management solutions</div></div>
+    </div>
+  </div>
+
+  <!-- S8B TEXT: big number, unit, label, sub -->
+  <div class="scene vb-scene" id="s8b">
+    <div class="vb-glow"></div>
+    <div class="vb-bignum">600</div>
+    <div class="vb-unit">KLPD +</div>
+    <div class="vb-label">Distillery Capacity Designed</div>
+    <div class="vb-sub">India's Green Fuel <br> E20 Ethanol Blending Programme <br> Turnkey Ethanol Plants</div>
+  </div>
+
+  <!-- S10 TEXT: eyebrow, headline, industry-first box, 3 bullets -->
+  <div class="scene" id="s10">
+    <div class="eyebrow">Green Fuel Mission</div>
+    <div class="big-statement">Distillery<br>&amp; <span class="hl">CBG</span></div>
+    <div class="neon-rule"></div>
+    <div class="industry-box">
+      <div class="ib-label">Industry First</div>
+      <div class="ib-text">Only company to give end-to-end solutions — Distillery, Power Plant, ZLD &amp; Boiler.</div>
+    </div>
+    <div class="blist">
+      <div class="bitem" id="b101"><div class="bnum">1</div><div class="btxt">Fermentation efficiency <em>&gt;93%</em> · ENA for potable alcohol</div></div>
+      <div class="bitem" id="b102"><div class="bnum">2</div><div class="btxt">Plant design for <em>2.0 kg/L</em> steam consumption</div></div>
+      <div class="bitem" id="b103"><div class="bnum">3</div><div class="btxt"><strong>CBG solutions</strong> from press mud, paddy straw, Napier grass &amp; municipal waste</div></div>
+    </div>
+  </div>
+
+  <!-- S10B TEXT: headline, sub, vertical ticker country names -->
+  <div class="scene" id="s10b">
+    <div class="tkb-head">Wherever Cane Grows,<br><span>ISGEC</span> Is There</div>
+    <div class="tkb-sub">54 countries · All cane-cultivating nations on earth</div>
+    <div class="nline"></div>
+    <div class="vwrap">
+      <div class="vtrack" id="ttrack2"></div>
+    </div>
+  </div>
+
+</div><!-- /stage -->
+
+<script>
+(function(){
+
+/* ══════ DOT MATRIX (locked to 1080×1920) ══════ */
+const dotC=document.getElementById('dotCanvas'),dotX=dotC.getContext('2d');
+const SP=28,RD=1.4;
+let DW=1080,DH=1920,dots=[],wave=0;
+dotC.width=DW; dotC.height=DH;
+
+function initDots(){
+  dots=[];
+  for(let r=0;r<=Math.ceil(DH/SP);r++)
+    for(let c=0;c<=Math.ceil(DW/SP);c++)
+      dots.push({x:c*SP+(Math.random()-.5)*3,y:r*SP+(Math.random()-.5)*3,
+        b:Math.random()*.06+.02,v:Math.random()*.04+.01,
+        tgt:Math.random()*.06+.02,spd:Math.random()*.011+.003,t:(Math.random()*280)|0,up:false});
+}
+
+function drawDots(){
+  dotX.clearRect(0,0,DW,DH);
+  wave=(wave+.32)%1200;
+  dots.forEach(d=>{
+    const dist=((d.x+d.y+1200-wave*2)%1200);
+    const wi=dist<600?Math.max(0,.15*(1-dist/300)):0;
+    if(--d.t<=0){
+      if(!d.up){d.up=true;d.tgt=Math.random()*.6+.15;d.t=(Math.random()*160+50)|0;}
+      else{d.up=false;d.tgt=d.b;d.t=(Math.random()*230+70)|0;}
+    }
+    d.v+=(d.tgt-d.v)*d.spd*(d.up?1:.5);
+    if(!d.up&&d.v<d.b)d.v=d.b;
+    const a=Math.min(1,d.v+wi);
+    dotX.beginPath();dotX.arc(d.x,d.y,RD,0,Math.PI*2);
+    dotX.fillStyle=`rgba(0,230,118,${a.toFixed(3)})`;dotX.fill();
+    if(a>.28){
+      const gr=dotX.createRadialGradient(d.x,d.y,0,d.x,d.y,RD*5);
+      gr.addColorStop(0,`rgba(0,230,118,${(a*.28).toFixed(3)})`);
+      gr.addColorStop(1,'rgba(0,230,118,0)');
+      dotX.beginPath();dotX.arc(d.x,d.y,RD*5,0,Math.PI*2);
+      dotX.fillStyle=gr;dotX.fill();
+    }
+  });
+  requestAnimationFrame(drawDots);
+}
+initDots();requestAnimationFrame(drawDots);
+
+
+/* ══════ GLOBE ══════ */
+const gC=document.getElementById('globeCanvas'),gX=gC.getContext('2d');
+gC.width=gC.height=420;
+let gA=0,globeOn=false;
+const cane=[[20,78],[23,90],[14,122],[7,81],[1,114],[-6,107],[13,-16],[8,-3],[4,9],[6,21],[-13,34],[3,26],[-18,47],[-26,28],[0,24],[15,30],[-15,-50],[-22,-47],[-14,-75],[4,-72],[9,-84],[15,-87],[18,-97],[23,-102],[21,-78],[19,-70],[11,-15],[14,-14],[5,-60],[13,2],[27,30],[-29,26],[17,-5],[-4,15],[12,15],[24,54],[14,44],[15,38],[17,96],[13,100],[10,105],[-20,164],[-17,-149],[-8,159],[-18,178],[10,-75],[-33,-65],[-9,147],[23,116],[17,8]];
+
+function drawGlobe(){
+  if(!globeOn)return;
+  const R=170,cx=210,cy=210;
+  gX.clearRect(0,0,420,420);
+  const g=gX.createRadialGradient(cx-40,cy-40,20,cx,cy,R);
+  g.addColorStop(0,'#051a0a');g.addColorStop(.7,'#020d05');g.addColorStop(1,'#060d08');
+  gX.beginPath();gX.arc(cx,cy,R,0,Math.PI*2);gX.fillStyle=g;gX.fill();
+  gX.strokeStyle='rgba(0,230,118,.09)';gX.lineWidth=.6;
+  for(let lat=-80;lat<=80;lat+=20){const sp=Math.sin(lat*Math.PI/180),cp=Math.cos(lat*Math.PI/180),yr=cy+R*sp,xr=R*cp;if(Math.abs(xr)>1){gX.beginPath();gX.ellipse(cx,yr,xr,xr*.3,0,0,Math.PI*2);gX.stroke();}}
+  for(let lon=0;lon<360;lon+=20){const a=((lon+gA)*Math.PI/180),ex=Math.cos(a)*R;gX.beginPath();gX.ellipse(cx,cy,Math.abs(ex),R,0,0,Math.PI*2);gX.stroke();}
+  gX.strokeStyle='rgba(0,230,118,.35)';gX.lineWidth=1;
+  gX.beginPath();gX.ellipse(cx,cy,R,R*.3,0,0,Math.PI*2);gX.stroke();
+  cane.forEach(([lat,lon])=>{const phi=lat*Math.PI/180,theta=((lon+gA)%360)*Math.PI/180,x3=Math.cos(phi)*Math.sin(theta),y3=-Math.sin(phi),z3=Math.cos(phi)*Math.cos(theta);if(z3>0){const sx=cx+x3*R,sy=cy+y3*R,br=.4+z3*.6;gX.beginPath();gX.arc(sx,sy,3.5,0,Math.PI*2);gX.fillStyle=`rgba(0,230,118,${br})`;gX.fill();const gg=gX.createRadialGradient(sx,sy,0,sx,sy,9);gg.addColorStop(0,`rgba(0,230,118,${(br*.3).toFixed(3)})`);gg.addColorStop(1,'rgba(0,0,0,0)');gX.beginPath();gX.arc(sx,sy,9,0,Math.PI*2);gX.fillStyle=gg;gX.fill();}});
+  const rim=gX.createRadialGradient(cx,cy,R-4,cx,cy,R+10);rim.addColorStop(0,'rgba(0,230,118,.13)');rim.addColorStop(1,'rgba(0,0,0,0)');gX.beginPath();gX.arc(cx,cy,R+6,0,Math.PI*2);gX.fillStyle=rim;gX.fill();
+  gA=(gA+.32)%360;requestAnimationFrame(drawGlobe);
+}
+
+
+/* ══════ PARTICLES (S4) ══════ */
+let particles=[],particleOn=false;
+const pCanvas=document.getElementById('particleCanvas');
+pCanvas.width=1080;pCanvas.height=1920;
+
+function startParticles(){
+  particles=[];
+  for(let i=0;i<70;i++){
+    particles.push({
+      x:Math.random()*1080,
+      y:Math.random()*1920+1920*.1,
+      size:Math.random()*3+1,
+      speed:Math.random()*0.6+0.3,
+      drift:(Math.random()-.5)*0.4,
+      opacity:Math.random()*0.35+0.05,
+      shape:Math.random()>.5?0:1
+    });
+  }
+  particleOn=true;drawParticles();
+}
+
+function drawParticles(){
+  if(!particleOn)return;
+  const ctx=pCanvas.getContext('2d');
+  ctx.clearRect(0,0,1080,1920);
+  particles.forEach(p=>{
+    p.y-=p.speed; p.x+=p.drift; p.opacity-=0.0008;
+    if(p.y<-10||p.opacity<=0){
+      p.y=1920+10; p.x=Math.random()*1080; p.opacity=Math.random()*0.35+0.05;
+    }
+    ctx.save();ctx.globalAlpha=p.opacity;ctx.fillStyle='rgba(0,230,118,1)';
+    if(p.shape===0){ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}
+    else{ctx.translate(p.x,p.y);ctx.rotate(Math.PI/4);ctx.fillRect(-p.size,-p.size,p.size*2,p.size*2);}
+    ctx.restore();
+  });
+  requestAnimationFrame(drawParticles);
+}
+
+
+/* ══════ COUNT-UP (S2B) ══════ */
+function startCountUp(){
+  const targets=[
+    {id:'om1',target:54,dur:1200},
+    {id:'om2',target:250,dur:1500},
+    {id:'om3',target:950,dur:1800},
+    {id:'om4',target:1000,dur:1600},
+  ];
+  targets.forEach(({id,target,dur},delay)=>{
+    setTimeout(()=>{
+      const el=document.getElementById(id);if(!el)return;
+      const start=performance.now();
+      function tick(now){
+        const t=Math.min(1,(now-start)/dur);
+        const eased=1-Math.pow(1-t,3);
+        el.textContent=Math.round(eased*target);
+        if(t<1)requestAnimationFrame(tick);else el.textContent=target;
+      }
+      requestAnimationFrame(tick);
+    },delay*250);
+  });
+}
+
+
+/* ══════ VERTICAL TICKER (S10B) ══════ */
+const countries2=['Brazil','India','China','Thailand','Mexico','Australia','Colombia','USA','Philippines','Indonesia','South Africa','Argentina','Guatemala','Cuba','Bolivia','Nigeria','Ethiopia','Kenya','Tanzania','Uganda','Zimbabwe','Mozambique','Sudan','Egypt','Morocco','Senegal','Ivory Coast','Cameroon','Zambia','Malawi','Madagascar','Mauritius','Bangladesh','Myanmar','Vietnam','Laos','Cambodia','Sri Lanka','Nepal','Fiji','Papua New Guinea','Guyana','Trinidad','Jamaica','Peru','Ecuador','Venezuela','Paraguay','El Salvador','Honduras'];
+const tt2=document.getElementById('ttrack2');
+[...countries2,...countries2].forEach(c=>{const d=document.createElement('div');d.className='vcountry';d.textContent=c;tt2.appendChild(d);});
+
+
+/* ══════ SCENE DEFINITIONS ══════ */
+const transitions=[
+  ['enter-zoom','exit-zoom-out'],       // s1
+  ['enter-from-bottom','exit-to-top'],  // s2b
+  ['enter-from-bottom','exit-to-top'],  // s3
+  ['enter-from-bottom','exit-to-top'],  // s4
+  ['enter-from-right','exit-to-left'],  // s5
+  ['enter-from-left','exit-to-right'],  // s6
+  ['enter-from-right','exit-to-left'],  // s7
+  ['enter-from-left','exit-to-right'],  // s8
+  ['enter-from-right','exit-to-left'],  // s9
+  ['enter-zoom','exit-zoom-out'],       // s8b
+  ['enter-from-bottom','exit-to-top'],  // s10
+  ['enter-from-bottom','exit-to-top'],  // s10b
+];
+const scenes=['s1','s2b','s3','s4','s5','s6','s7','s8','s9','s8b','s10','s10b'];
+const durs=[
+  1000, // s1  logo
+  14000, // s2b stats (4 cards + count-up)
+  12000, // s3  globe
+  17000, // s4  tech grid (12 pills)
+  12000, // s5  milling
+  12000, // s6  falling film evaporator
+  12000, // s7  sugar refinery
+  12000, // s8  vertical continuous pan
+  12000, // s9  steam economy
+  10000, // s8b 600 klpd break
+  13000, // s10 distillery & cbg
+  14000  // s10b countries ticker
+];
+const totalDur=durs.reduce((a,b)=>a+b,0);
+const progBar=document.getElementById('progress');
+const cornerLogo=document.getElementById('corner-logo');
+let cur=0,sceneStart=0,busy=false;
+
+function showScene(idx){
+  globeOn=false;particleOn=false;
+  cornerLogo.style.display = idx===0 ? 'none' : 'flex';
+  const el=document.getElementById(scenes[idx]);
+  const [enterCls]=transitions[idx];
+  el.className='scene '+enterCls;
+  cur=idx;sceneStart=performance.now();
+
+  if(idx===2){globeOn=true;drawGlobe();}
+  if(idx===1){startCountUp();}
+  if(idx===3){startParticles();}
+
+  const bulletMap={
+    4:['b51','b52','b53','b54'],
+    5:['b61','b62','b63','b64'],
+    6:['b71','b72','b73','b74'],
+    7:['b81','b82','b83','b84'],
+    8:['b91','b92','b93','b94'],
+    10:['b101','b102','b103'],
+  };
+  if(bulletMap[idx]){
+    bulletMap[idx].forEach((id,i)=>setTimeout(()=>{
+      const e=document.getElementById(id);if(e)e.classList.add('show');
+    },400+i*420));
+  }
+}
+
+function advance(){
+  if(busy)return;busy=true;
+  const prev=cur;
+  const [,exitCls]=transitions[prev];
+  const prevEl=document.getElementById(scenes[prev]);
+  prevEl.className='scene '+exitCls;
+  setTimeout(()=>{
+    prevEl.className='scene';
+    document.querySelectorAll('.bitem').forEach(el=>el.classList.remove('show'));
+    const next=(prev+1)%scenes.length;
+    showScene(next);
+    setTimeout(()=>{busy=false;},250);
+  },450);
+}
+
+function tick(ts){
+  if(!busy&&ts-sceneStart>=durs[cur])advance();
+  let c=0;
+  for(let i=0;i<cur;i++)c+=durs[i];
+  c+=Math.min(ts-sceneStart,durs[cur]);
+  progBar.style.width=((c%totalDur)/totalDur*100)+'%';
+  requestAnimationFrame(tick);
+}
+
+showScene(0);
+requestAnimationFrame(tick);
+
+
+/* Optional: scale stage to fit smaller preview windows (does not affect the 1080×1920 output) */
+function fitStage(){
+  const s=document.getElementById('stage');
+  const scale=Math.min(window.innerWidth/1080,window.innerHeight/1920);
+  if(scale<1){
+    s.style.transform=`scale(${scale})`;
+    s.style.transformOrigin='center center';
+  }else{
+    s.style.transform='none';
+  }
+}
+window.addEventListener('resize',fitStage);
+fitStage();
+
+})();
+</script>
+
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a1554ae1cc2925a4',t:'MTc4MzA3NTQ0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
